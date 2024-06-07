@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>SBP XR Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="icon"
+        href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAKklEQVR42mJ89P///1/4j3DkQH5AIgCqAXQgIt2DnlK7/9lBgBgBhDQOBACDAABBgAGBgBDFScxwAAAAAElFTkSuQmCC"
+        type="image/png">
+    <style>
+        body {
+            margin: 0;
+            background-color: #202020;
+            color: white;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .custom-file-input {
+            display: none;
+        }
+
+        .custom-file-label {
+            cursor: pointer;
+            background-color: #343a40;
+            color: #ffffff;
+            border-color: #343a40;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.25rem;
+        }
+
+        .custom-file-label:hover {
+            background-color: #495057;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            font-size: small;
+            color: gray;
+            background-color: #343a40;
+            padding: 5px;
+        }
+
+        #loadingIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 200;
+            display: none;
+            color: white;
+            font-size: 24px;
+        }
+
+        #fileSpinner {
+            display: none;
+        }
+
+        .settings-label {
+            margin-bottom: 0.5rem;
+            width: 600px;
+            display: block;
+            text-align: center;
+            cursor: pointer;
+            /* Make label clickable */
+        }
+
+        .link-text {
+            color: #dee2e6;
+            cursor: pointer;
+            font-size: small;
+            text-decoration: underline;
+            white-space: normal;
+            display: block;
+            width: 300px;
+            text-align: center;
+            margin: 0 auto;
+        }
+
+        .link-text:hover {
+            color: #ffffff;
+        }
+
+        .custom-vr-button {
+            left: calc(50% - 90px) !important;
+            width: 180px !important;
+            text-decoration: none !important;
+            position: absolute !important;
+            bottom: 40px !important;
+            padding: 12px 6px !important;
+            border: 1px solid #ffffff !important;
+            border-radius: 4px !important;
+            background: rgba(0, 0, 0, 0.1) !important;
+            color: #ffffff !important;
+            font-size: 13px !important;
+            text-align: center !important;
+            opacity: 0.5 !important;
+            outline: currentcolor !important;
+            z-index: 999 !important;
+        }
+
+        .custom-vr-button:hover {
+            background-color: #343a40 !important;
+            border-color: #343a40 !important;
+            opacity: 0.7 !important;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.149.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark controls">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">SBP XR Viewer</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0"></ul>
+                <ul class="navbar-nav mb-2 mb-lg=0 d-flex align-items-center">
+                    <li class="nav-item me-2 d-flex align-items-center">
+                        <div id="fileSpinner" class="spinner-border text-light me-2" role="status"
+                            style="width: 1rem; height: 1rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </li>
+                    <li class="nav-item me-2 d-flex align-items-center">
+                        <label for="fileInput" class="custom-file-label" disabled>Choose File</label>
+                        <input type="file" id="fileInput" accept=".txt" class="custom-file-input" disabled>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-dark dropdown-toggle" type="button" id="settingsButton"
+                            data-bs-toggle="dropdown" aria-expanded="false">Settings</button>
+                        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark p-3"
+                            aria-labelledby="settingsButton">
+                            <li class="mb-3">
+                                <label for="verticalScale" id="verticalScaleLabel" class="settings-label">Z Scale:
+                                    1x</label>
+                                <input type="range" id="verticalScale" min="1" max="10" value="1" step="0.5"
+                                    class="form-range">
+                                <div class="collapse" id="flatNotif">
+                                    <a id="setZFactorLink" class="link-text">Too flat? Increase the vertical scale.</a>
+                                </div>
+                            </li>
+                            <li class="mb-3">
+                                <label for="pointSize" id="pointSizeLabel" class="settings-label">Point Size: 8%</label>
+                                <input type="range" id="pointSize" min="1" max="100" value="8" step="1"
+                                    class="form-range">
+                            </li>
+                            <li class="mb-3">
+                                <label for="transparency" id="transparencyLabel" class="settings-label">Opacity:
+                                    1x</label>
+                                <input type="range" id="transparency" min="0.1" max="2" value="1" step="0.1"
+                                    class="form-range">
+                            </li>
+                            <li class="mb-3">
+                                <label id="intensityFilterLabel" class="settings-label">Min Intensity: 0</label>
+                                <input type="range" id="intensityFilter" min="0" max="1" value="0" step="0.01"
+                                    class="form-range">
+                                <label id="pointCountLabel" class="settings-label"
+                                    style="font-size: small; color: gray;">Points: 0</label>
+                            </li>
+                            <li class="mb-3">
+                                <label for="colorPalette" class="settings-label">Color Palette</label>
+                                <select id="colorPalette" class="form-select">
+                                    <option value="rainbow" selected>Rainbow</option>
+                                    <option value="redBlue">Red/Blue</option>
+                                    <option value="greyscale">Greyscale</option>
+                                    <option value="viridis">Viridis</option>
+                                    <option value="magma">Magma</option>
+                                </select>
+                            </li>
+                            <li class="mb-3">
+                                <label for="modelScale" id="modelScaleLabel" class="settings-label">Model Scale:
+                                    100%</label>
+                                <input type="range" id="modelScale" min="0.05" max="1" value="1" step="0.01"
+                                    class="form-range">
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div id="loadingIndicator">Loading...</div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+        import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let camera, scene, renderer, controls;
+        let baseReferenceSpace;
+        const tempMatrix = new THREE.Matrix4();
+        let pointsObject = null;
+        let pointsData = null;
+        let originalPoints = null;
+        let currentVerticalScale = 1;
+        let currentPointSize = 1;
+        let currentTransparency = 1;
+        let currentIntensityFilter = 0;
+        let currentModelScale = 1;
+        let geometry = null;
+        const PRESET_URL = 'https://patrick-morrison.github.io/sbp-vr/james_matthews_github.txt';
+
+        let hand1, hand2;
+        let initialRotationAngle = 0;
+        let initialRotation = false;
+
+        let activeHand = null;
+        let scaling = {
+            active: false,
+            initialDistance: 0,
+            initialScale: 1
+        };
+        let rotating = {
+            active: false,
+            initialAngle: 0
+        };
+        let dragging = false;
+        let initialHandPosition = new THREE.Vector3();
+
+
+
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(2, 2, 2);
+
+            scene.add(new THREE.HemisphereLight(0xa5a5a5, 0x898989, 1));
+
+            const light = new THREE.DirectionalLight(0xffffff, 3);
+            light.position.set(1, 1, 1).normalize();
+            scene.add(light);
+
+            const cubeGeometry = new THREE.BoxGeometry(100, 100, 100);
+            const cubeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.7, transparent: true, side: THREE.DoubleSide });
+            const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+            cube.position.set(0, 0, 0); // Adjust the position as needed
+            cube.renderOrder = 0;
+            camera.add(cube);
+            scene.add(camera);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0);
+            controls.update(); // Ensure the controls are updated with the new target
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            controls.screenSpacePanning = true;
+            controls.maxPolarAngle = Math.PI;
+            controls.minPolarAngle = 0;
+            controls.enableRotate = true;
+
+
+            document.body.appendChild(renderer.domElement);
+            const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test', 'hand-tracking'] });
+            arButton.classList.add('btn', 'btn-dark', 'custom-vr-button');
+            document.body.appendChild(arButton);
+
+            renderer.xr.addEventListener('sessionstart', () => {
+                baseReferenceSpace = renderer.xr.getReferenceSpace();
+                controls.enabled = false;
+                renderer.xr.setFoveation(0);
+            });
+
+            renderer.xr.addEventListener('sessionend', () => {
+                controls.enabled = true;
+            });
+
+            const controllerModelFactory = new XRControllerModelFactory();
+            const handModelFactory = new XRHandModelFactory();
+
+            // Hand 1
+            const controllerGrip1 = renderer.xr.getControllerGrip(0);
+            controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+            scene.add(controllerGrip1);
+
+            hand1 = renderer.xr.getHand(0);
+            hand1.addEventListener('pinchstart', onPinchStart);
+            hand1.addEventListener('pinchend', onPinchEnd);
+            hand1.add(handModelFactory.createHandModel(hand1, 'mesh'));
+            scene.add(hand1);
+
+            // Hand 2
+            const controllerGrip2 = renderer.xr.getControllerGrip(1);
+            controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+            scene.add(controllerGrip2);
+
+            hand2 = renderer.xr.getHand(1);
+            hand2.addEventListener('pinchstart', onPinchStart);
+            hand2.addEventListener('pinchend', onPinchEnd);
+            hand2.add(handModelFactory.createHandModel(hand2, 'mesh'));
+            scene.add(hand2);
+            hand1.userData.pinch = false;
+            hand2.userData.pinch = false;
+
+            window.addEventListener('resize', onWindowResize, false);
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+
+            document.getElementById('verticalScale').addEventListener('input', function (event) {
+                currentVerticalScale = event.target.value;
+                document.getElementById('verticalScaleLabel').textContent = `Z Scale: ${currentVerticalScale}x`;
+                if (originalPoints) {
+                    pointsData = processPoints(originalPoints, currentVerticalScale);
+                    visualizePointCloud(pointsData);
+                }
+                var flatNotif = new bootstrap.Collapse(document.getElementById('flatNotif'), { toggle: false });
+                flatNotif.hide();
+            });
+
+            document.getElementById('pointSize').addEventListener('input', function (event) {
+                const pointSizePercentage = event.target.value;
+                const pointSize = pointSizePercentage / 100; // Convert percentage to a scale factor
+                document.getElementById('pointSizeLabel').textContent = `Point Size: ${pointSizePercentage}%`;
+                currentPointSize = pointSize;
+                if (pointsData) {
+                    updatePointCloud(pointsData);
+                }
+            });
+
+            document.getElementById('transparency').addEventListener('input', function (event) {
+                currentTransparency = parseFloat(event.target.value);
+                document.getElementById('transparencyLabel').textContent = `Opacity: ${currentTransparency}x`;
+                if (pointsData) {
+                    updatePointCloud(pointsData);
+                }
+            });
+
+            document.getElementById('intensityFilter').addEventListener('input', function (event) {
+                currentIntensityFilter = event.target.value;
+                document.getElementById('intensityFilterLabel').textContent = `Min Intensity: ${currentIntensityFilter}`;
+                if (pointsData) {
+                    visualizePointCloud(pointsData);
+                }
+            });
+
+            document.getElementById('colorPalette').addEventListener('change', function () {
+                if (pointsData) {
+                    visualizePointCloud(pointsData);
+                }
+            });
+
+            document.getElementById('setZFactorLink').addEventListener('click', function () {
+                event.stopPropagation();
+                document.getElementById('verticalScale').value = 10;
+                document.getElementById('verticalScale').dispatchEvent(new Event('input'));
+                var flatNotif = new bootstrap.Collapse(document.getElementById('flatNotif'), { toggle: false });
+                flatNotif.hide();
+            });
+
+            document.getElementById('verticalScaleLabel').addEventListener('click', function (event) {
+                event.stopPropagation();
+                const verticalScale = document.getElementById('verticalScale');
+                verticalScale.value = 1;
+                currentVerticalScale = 1;
+                document.getElementById('verticalScaleLabel').textContent = `Z Scale: ${currentVerticalScale}x`;
+                if (originalPoints) {
+                    pointsData = processPoints(originalPoints, currentVerticalScale);
+                    visualizePointCloud(pointsData);
+                }
+            });
+
+            document.getElementById('pointSizeLabel').addEventListener('click', function (event) {
+                event.stopPropagation();
+                const pointSize = document.getElementById('pointSize');
+                pointSize.value = 1;
+                currentPointSize = 1;
+                document.getElementById('pointSizeLabel').textContent = `Point Size: ${currentPointSize}x`;
+                if (pointsData) {
+                    updatePointCloud(pointsData);
+                }
+            });
+
+            document.getElementById('transparencyLabel').addEventListener('click', function (event) {
+                event.stopPropagation();
+                const transparency = document.getElementById('transparency');
+                transparency.value = 1;
+                currentTransparency = 1;
+                document.getElementById('transparencyLabel').textContent = `Opacity: ${currentTransparency}x`;
+                if (pointsData) {
+                    updatePointCloud(pointsData);
+                }
+            });
+
+            document.getElementById('modelScale').addEventListener('input', function (event) {
+                currentModelScale = event.target.value;
+                document.getElementById('modelScaleLabel').textContent = `Model Scale: ${Math.round(currentModelScale * 100)}%`;
+                if (originalPoints) {
+                    pointsData = processPoints(originalPoints, currentVerticalScale);
+                    visualizePointCloud(pointsData);
+                }
+            });
+
+
+            // Set initial slider values
+            const verticalScale = document.getElementById('verticalScale');
+            const pointSize = document.getElementById('pointSize');
+            const transparency = document.getElementById('transparency');
+            const intensityFilter = document.getElementById('intensityFilter');
+            const colorPalette = document.getElementById('colorPalette');
+            const modelScale = document.getElementById('modelScale');
+            const verticalAdjustment = document.getElementById('verticalAdjustment');
+
+            document.getElementById('verticalScale').value = 10;
+            document.getElementById('verticalScaleLabel').textContent = `Z Scale: 10x`;
+            document.getElementById('verticalScale').dispatchEvent(new Event('input'));
+
+            document.getElementById('pointSize').value = 6;
+            document.getElementById('pointSizeLabel').textContent = `Point Size: 6%`;
+            document.getElementById('pointSize').dispatchEvent(new Event('input'));
+
+            document.getElementById('transparency').value = 0.4;
+            document.getElementById('transparencyLabel').textContent = `Opacity: 0.4x`;
+            document.getElementById('transparency').dispatchEvent(new Event('input'));
+
+            document.getElementById('intensityFilter').value = 0.00;
+            document.getElementById('intensityFilterLabel').textContent = `Min Intensity: 0.00`;
+            document.getElementById('intensityFilter').dispatchEvent(new Event('input'));
+
+            document.getElementById('colorPalette').value = 'rainbow';
+
+            document.getElementById('modelScale').value = 0.08;
+            document.getElementById('modelScaleLabel').textContent = `Model Scale: 8%`;
+            document.getElementById('modelScale').dispatchEvent(new Event('input'));
+
+            // Fetch and load the preset file
+            fetchPresetFile();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            renderer.setAnimationLoop(render);
+        }
+
+        function render() {
+            if (controls.enabled) {
+                controls.update();
+            }
+
+            if (dragging && ((hand1.userData.pinch && !hand2.userData.pinch) || (!hand1.userData.pinch && hand2.userData.pinch))) {
+                const handPosition = activeHand.joints['index-finger-tip'].position;
+                const delta = handPosition.clone().sub(initialHandPosition);
+                pointsObject.position.add(delta);
+                initialHandPosition.copy(handPosition);
+            }
+
+            if (hand1.userData.pinch && hand2.userData.pinch) {
+                const indexTip1Pos = hand1.joints['index-finger-tip'].position;
+                const indexTip2Pos = hand2.joints['index-finger-tip'].position;
+
+                // Handle Scaling
+                const distance = indexTip1Pos.distanceTo(indexTip2Pos);
+                const newScale = scaling.initialScale + (distance / scaling.initialDistance - 1);
+                pointsObject.scale.setScalar(newScale);
+
+                // Handle Rotation
+                const currentAngle = Math.atan2(indexTip2Pos.z - indexTip1Pos.z, indexTip2Pos.x - indexTip1Pos.x);
+                const deltaAngle = currentAngle - rotating.initialAngle;
+                pointsObject.rotation.y -= deltaAngle; // Adjust this if rotation direction is incorrect
+                rotating.initialAngle = currentAngle;  // Update initial angle for next frame
+            }
+
+            renderer.render(scene, camera);
+        }
+
+
+
+
+
+
+
+
+
+
+        function fetchPresetFile() {
+            fetch(PRESET_URL)
+                .then(response => response.text())
+                .then(data => {
+                    originalPoints = parsePointCloudData(data);
+                    pointsData = processPoints(originalPoints, currentVerticalScale);
+                    visualizePointCloud(pointsData);
+                    checkFileHeight(originalPoints);
+                })
+                .catch(error => console.error('Error fetching preset file:', error));
+
+            const fileName = 'james_matthews.txt';
+            document.querySelector('.custom-file-label').textContent = fileName;
+        }
+
+        function handleFileSelect(event) {
+            showSpinner();
+            requestAnimationFrame(() => {
+                const file = event.target.files[0];
+                const reader = new FileReader();
+
+                reader.onload = function (e) {
+                    const contents = e.target.result;
+                    originalPoints = parsePointCloudData(contents);
+                    pointsData = processPoints(originalPoints, currentVerticalScale);
+                    visualizePointCloud(pointsData);
+                    checkFileHeight(originalPoints);
+                    hideSpinner();
+                };
+
+                reader.readAsText(file);
+
+                // Update the file input label
+                const fileName = file.name;
+                document.querySelector('.custom-file-label').textContent = fileName;
+            });
+        }
+
+        function showSpinner() {
+            const fileSpinner = document.getElementById('fileSpinner');
+            fileSpinner.style.display = 'block';
+        }
+
+        function hideSpinner() {
+            const fileSpinner = document.getElementById('fileSpinner');
+            fileSpinner.style.display = 'none';
+        }
+
+        function parsePointCloudData(data) {
+            const lines = data.split('\n');
+            const points = [];
+            let minIntensity = Infinity, maxIntensity = -Infinity;
+            let minX = Infinity, minY = Infinity, minZ = Infinity;
+            let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+            for (let line of lines) {
+                const [x, y, z, intensity] = line.split(' ').map(Number);
+                if (!isNaN(x) && !isNaN(y) && !isNaN(z) && !isNaN(intensity)) {
+                    points.push({ position: new THREE.Vector3(x, y, z), intensity });
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    minZ = Math.min(minZ, z);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                    maxZ = Math.max(maxZ, z);
+                    minIntensity = Math.min(minIntensity, intensity);
+                    maxIntensity = Math.max(maxIntensity, intensity);
+                }
+            }
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const centerZ = (minZ + maxZ) / 2;
+            points.forEach(point => {
+                point.position.x -= centerX;
+                point.position.y -= centerY;
+                point.position.z -= centerZ;
+            });
+            return { points, minIntensity, maxIntensity };
+        }
+
+        function processPoints(pointCloud, scale) {
+            const noiseFactor = 0.02; // Adjust this value to control the amount of noise
+
+            const processedPoints = pointCloud.points.map(point => ({
+                x: point.position.x * currentModelScale + (Math.random() - 0.5) * noiseFactor,
+                y: (point.position.z * currentModelScale * scale) + (Math.random() - 0.5) * noiseFactor,
+                z: point.position.y * currentModelScale + (Math.random() - 0.5) * noiseFactor,
+                intensity: point.intensity
+            }));
+
+            return { points: processedPoints, minIntensity: pointCloud.minIntensity, maxIntensity: pointCloud.maxIntensity };
+        }
+
+        function getColor(value, palette) {
+            const norm = value / 1.0;
+            if (palette === 'rainbow') {
+                const hue = (1.0 - norm) * 360;
+                return new THREE.Color(`hsl(${hue}, 85%, 50%)`);
+            } else if (palette === 'redBlue') {
+                const r = norm > 0.5 ? 1 : 2 * norm;
+                const g = norm > 0.5 ? 2 * (1 - norm) : 2 * norm;
+                const b = norm < 0.5 ? 1 : 2 * (1 - norm);
+                return new THREE.Color(r * 0.6 + 0.4, g * 0.6 + 0.4, b * 0.6 + 0.4);
+            } else if (palette === 'greyscale') {
+                return new THREE.Color(norm, norm, norm);
+            } else if (palette === 'viridis') {
+                const viridis = [
+                    [68, 1, 84],
+                    [72, 40, 120],
+                    [62, 74, 137],
+                    [49, 104, 142],
+                    [38, 130, 142],
+                    [31, 158, 137],
+                    [53, 183, 121],
+                    [109, 205, 89],
+                    [180, 222, 44],
+                    [253, 231, 37]
+                ];
+                const colorIndex = Math.floor(norm * (viridis.length - 1));
+                const color = viridis[colorIndex];
+                return new THREE.Color(`rgb(${color[0]}, ${color[1]}, ${color[2]})`);
+            } else if (palette === 'magma') {
+                const magma = [
+                    [0, 0, 4],
+                    [28, 16, 68],
+                    [79, 18, 123],
+                    [129, 37, 129],
+                    [181, 54, 122],
+                    [229, 80, 100],
+                    [252, 135, 97],
+                    [254, 194, 135],
+                    [252, 253, 191]
+                ];
+                const colorIndex = Math.floor(norm * (magma.length - 1));
+                const color = magma[colorIndex];
+                return new THREE.Color(`rgb(${color[0]}, ${color[1]}, ${color[2]})`);
+            }
+        }
+
+        function visualizePointCloud(pointCloud) {
+            const { points, minIntensity, maxIntensity } = pointCloud;
+            const colorPalette = document.getElementById('colorPalette').value;
+
+            if (pointsObject) {
+                scene.remove(pointsObject);
+                pointsObject.geometry.dispose();
+                pointsObject.material.dispose();
+            }
+
+            const positions = [];
+            const colors = [];
+            const sizes = [];
+            const opacities = [];
+            let filteredPointCount = 0;
+
+            points.forEach(point => {
+                if (point.intensity >= currentIntensityFilter * maxIntensity) {
+                    positions.push(point.x, point.y, point.z);
+
+                    const intensityNorm = (point.intensity - currentIntensityFilter * maxIntensity) / (maxIntensity - currentIntensityFilter * maxIntensity);
+                    const color = getColor(intensityNorm, colorPalette);
+                    colors.push(color.r, color.g, color.b);
+
+                    sizes.push(currentPointSize * intensityNorm); // Adjust point size based on intensity and slider value
+                    opacities.push(currentTransparency * intensityNorm); // Apply opacity based on intensity and slider value
+                    filteredPointCount++;
+                }
+            });
+
+            geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+            geometry.setAttribute('opacity', new THREE.Float32BufferAttribute(opacities, 1));
+
+            const material = new THREE.ShaderMaterial({
+                vertexColors: true,
+                transparent: true,
+                depthTest: false,
+                uniforms: {},
+                vertexShader: `
+                    attribute float size;
+                    attribute float opacity;
+                    varying vec3 vColor;
+                    varying float vOpacity;
+                    void main() {
+                        vColor = color;
+                        vOpacity = opacity;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_PointSize = size * (300.0 / -mvPosition.z);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vOpacity;
+                    void main() {
+                        gl_FragColor = vec4(vColor, vOpacity);
+                        float dist = distance(gl_PointCoord, vec2(0.5, 0.5));
+                        if (dist > 0.6) discard;
+                    }
+                `,
+            });
+
+            pointsObject = new THREE.Points(geometry, material);
+            pointsObject.renderOrder = 1;
+            scene.add(pointsObject);
+
+            document.getElementById('pointCountLabel').textContent = `Points: ${filteredPointCount.toLocaleString()}`;
+        }
+
+        function updatePointCloud(pointCloud) {
+            if (!geometry) return;
+
+            const { points, minIntensity, maxIntensity } = pointCloud;
+            const colorPalette = document.getElementById('colorPalette').value;
+
+            const sizes = [];
+            const opacities = [];
+            let filteredPointCount = 0;
+
+            points.forEach(point => {
+                if (point.intensity >= currentIntensityFilter * maxIntensity) {
+                    const intensityNorm = (point.intensity - currentIntensityFilter * maxIntensity) / (maxIntensity - currentIntensityFilter * maxIntensity);
+                    sizes.push(currentPointSize * intensityNorm); // Adjust point size based on intensity and slider value
+                    opacities.push(currentTransparency * intensityNorm); // Apply opacity based on intensity and slider value
+                    filteredPointCount++;
+                }
+            });
+
+            geometry.attributes.size.array = new Float32Array(sizes);
+            geometry.attributes.size.needsUpdate = true;
+
+            geometry.setAttribute('opacity', new THREE.Float32BufferAttribute(opacities, 1));
+            geometry.attributes.opacity.needsUpdate = true;
+
+            document.getElementById('pointCountLabel').textContent = `Points: ${filteredPointCount.toLocaleString()}`;
+        }
+
+
+        function checkFileHeight(pointCloud) {
+            const height = pointCloud.points.reduce((max, point) => Math.max(max, point.position.z), 0);
+            if (height < 10) {
+                showNotification();
+            }
+        }
+
+        function showNotification() {
+            var flatNotif = new bootstrap.Collapse(document.getElementById('flatNotif'));
+            flatNotif.show();
+        }
+
+        function onPinchStart(event) {
+            const controller = event.target;
+            const indexTip = controller.joints['index-finger-tip'];
+
+            if (!hand1.userData.pinch && controller === hand1) {
+                hand1.userData.pinch = true;
+            }
+            if (!hand2.userData.pinch && controller === hand2) {
+                hand2.userData.pinch = true;
+            }
+
+            // One-hand pinch
+            if ((hand1.userData.pinch && !hand2.userData.pinch) || (!hand1.userData.pinch && hand2.userData.pinch)) {
+                dragging = true;
+                initialHandPosition.copy(indexTip.position);
+                activeHand = controller;
+            }
+
+            // Two-hand pinch
+            if (hand1.userData.pinch && hand2.userData.pinch) {
+                if (!scaling.active && !rotating.active) {
+                    const indexTip1 = hand1.joints['index-finger-tip'];
+                    const indexTip2 = hand2.joints['index-finger-tip'];
+                    scaling.active = true;
+                    scaling.initialDistance = indexTip1.position.distanceTo(indexTip2.position);
+                    scaling.initialScale = pointsObject.scale.x;
+                    rotating.active = true;
+                    rotating.initialAngle = Math.atan2(indexTip2.position.z - indexTip1.position.z, indexTip2.position.x - indexTip1.position.x);
+                }
+            }
+        }
+
+
+
+
+
+
+
+        function onPinchEnd(event) {
+            const controller = event.target;
+            if (controller === hand1) {
+                hand1.userData.pinch = false;
+            } else if (controller === hand2) {
+                hand2.userData.pinch = false;
+            }
+
+            if (!hand1.userData.pinch && !hand2.userData.pinch) {
+                dragging = false;
+                scaling.active = false;
+                rotating.active = false;
+            } else if (!hand1.userData.pinch || !hand2.userData.pinch) {
+                // If only one hand remains pinched
+                scaling.active = false;
+                rotating.active = false;
+            }
+        }
+
+
+
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+        crossorigin="anonymous"></script>
+    <div class="footer">
+        Created in 2024 by Patrick Morrison. <a href="https://github.com/patrick-morrison/sbp_viewer"
+            style="color: gray;">Source Code</a>
+    </div>
+</body>
+
+</html>
