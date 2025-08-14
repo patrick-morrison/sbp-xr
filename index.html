@@ -148,6 +148,12 @@
                         </div>
                     </li>
                     <li class="nav-item me-2 d-flex align-items-center">
+                        <select id="presetSelector" class="form-select me-2" style="width: auto;">
+                            <option value="james_matthews_github.txt">James Matthews</option>
+                            <option value="InterpDugong_20250531_124136_voxR.txt">Interp Dugong</option>
+                        </select>
+                    </li>
+                    <li class="nav-item me-2 d-flex align-items-center">
                         <label for="fileInput" class="custom-file-label" disabled>Choose File</label>
                         <input type="file" id="fileInput" accept=".txt" class="custom-file-input" disabled>
                     </li>
@@ -227,7 +233,7 @@
         let currentIntensityFilter = 0;
         let currentModelScale = 1;
         let geometry = null;
-        const PRESET_URL = 'https://patrick-morrison.github.io/sbp-vr/james_matthews_github.txt';
+        let PRESET_URL = 'https://patrick-morrison.github.io/sbp-vr/james_matthews_github.txt';
 
         let hand1, hand2;
         let initialRotationAngle = 0;
@@ -331,6 +337,7 @@
 
             window.addEventListener('resize', onWindowResize, false);
             document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+            document.getElementById('presetSelector').addEventListener('change', handlePresetChange, false);
 
             document.getElementById('verticalScale').addEventListener('input', function (event) {
                 currentVerticalScale = event.target.value;
@@ -512,19 +519,102 @@
 
 
 
-        function fetchPresetFile() {
-            fetch(PRESET_URL)
-                .then(response => response.text())
+        function handlePresetChange(event) {
+            const selectedFile = event.target.value;
+            loadPresetFile(selectedFile);
+        }
+
+        function loadPresetFile(filename) {
+            showSpinner();
+            
+            // Try to load local file first, then fallback to remote URL
+            fetch(filename)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Local file not found');
+                    }
+                    return response.text();
+                })
+                .catch(() => {
+                    // Fallback to remote URL for james_matthews file
+                    if (filename === 'james_matthews_github.txt') {
+                        return fetch(PRESET_URL).then(response => response.text());
+                    }
+                    throw new Error('File not available');
+                })
                 .then(data => {
+                    // Apply dataset-specific default settings
+                    applyPresetDefaults(filename);
+                    
                     originalPoints = parsePointCloudData(data);
                     pointsData = processPoints(originalPoints, currentVerticalScale);
                     visualizePointCloud(pointsData);
                     checkFileHeight(originalPoints);
+                    hideSpinner();
+                    
+                    // Update file label to show selected preset
+                    const displayName = filename.replace('_github.txt', '').replace('.txt', '').replace(/_/g, ' ');
+                    document.querySelector('.custom-file-label').textContent = displayName;
                 })
-                .catch(error => console.error('Error fetching preset file:', error));
+                .catch(error => {
+                    console.error('Error loading preset file:', error);
+                    hideSpinner();
+                });
+        }
 
-            const fileName = 'james_matthews.txt';
-            document.querySelector('.custom-file-label').textContent = fileName;
+        function applyPresetDefaults(filename) {
+            if (filename.includes('InterpDugong')) {
+                // Dugong defaults
+                document.getElementById('verticalScale').value = 1;
+                document.getElementById('verticalScaleLabel').textContent = 'Z Scale: 1x';
+                currentVerticalScale = 1;
+
+                document.getElementById('pointSize').value = 12;
+                document.getElementById('pointSizeLabel').textContent = 'Point Size: 12%';
+                currentPointSize = 12 / 100;
+
+                document.getElementById('transparency').value = 1.2;
+                document.getElementById('transparencyLabel').textContent = 'Opacity: 1.2x';
+                currentTransparency = 1.2;
+
+                document.getElementById('intensityFilter').value = 0.01;
+                document.getElementById('intensityFilterLabel').textContent = 'Min Intensity: 0.01';
+                currentIntensityFilter = 0.01;
+
+                document.getElementById('colorPalette').value = 'rainbow';
+
+                document.getElementById('modelScale').value = 0.08;
+                document.getElementById('modelScaleLabel').textContent = 'Model Scale: 8%';
+                currentModelScale = 0.08;
+            } else {
+                // James Matthews defaults (existing)
+                document.getElementById('verticalScale').value = 10;
+                document.getElementById('verticalScaleLabel').textContent = 'Z Scale: 10x';
+                currentVerticalScale = 10;
+
+                document.getElementById('pointSize').value = 6;
+                document.getElementById('pointSizeLabel').textContent = 'Point Size: 6%';
+                currentPointSize = 6 / 100;
+
+                document.getElementById('transparency').value = 0.4;
+                document.getElementById('transparencyLabel').textContent = 'Opacity: 0.4x';
+                currentTransparency = 0.4;
+
+                document.getElementById('intensityFilter').value = 0;
+                document.getElementById('intensityFilterLabel').textContent = 'Min Intensity: 0';
+                currentIntensityFilter = 0;
+
+                document.getElementById('colorPalette').value = 'rainbow';
+
+                document.getElementById('modelScale').value = 0.08;
+                document.getElementById('modelScaleLabel').textContent = 'Model Scale: 8%';
+                currentModelScale = 0.08;
+            }
+        }
+
+        function fetchPresetFile() {
+            const selectedFile = document.getElementById('presetSelector').value;
+            loadPresetFile(selectedFile);
         }
 
         function handleFileSelect(event) {
