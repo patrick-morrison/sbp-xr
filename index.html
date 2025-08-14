@@ -151,7 +151,7 @@
                         <select id="presetSelector" class="form-select me-2" style="width: auto;">
                             <option value="james_matthews_github.txt">James Matthews</option>
                             <option value="InterpDugong_20250531_124136_voxR.txt">Interp Dugong</option>
-                            <option value="Dugong ASCII combo XS & LS.txt">Dugong ASCII Combo</option>
+                            <option value="dugong_test.txt">Dugong ASCII Combo</option>
                         </select>
                     </li>
                     <li class="nav-item me-2 d-flex align-items-center">
@@ -564,7 +564,7 @@
         }
 
         function applyPresetDefaults(filename) {
-            if (filename.includes('InterpDugong') || filename.includes('Dugong ASCII combo')) {
+            if (filename.includes('InterpDugong') || filename.includes('dugong_test')) {
                 // Dugong defaults
                 document.getElementById('verticalScale').value = 1;
                 document.getElementById('verticalScaleLabel').textContent = 'Z Scale: 1x';
